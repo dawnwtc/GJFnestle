@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>排日程</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            width: 80%;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .date-inputs {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .date-inputs .form-group {
+            flex: 1;
+            min-width: 150px;
+        }
+    </style>
+</head>
+<script type="text/javascript" src="../../js/util.js"></script>
+<script type="text/javascript" src="../../js/dialog.js"></script>
+<script type="text/javascript" src="../../.debugTemp/wpsjsrpcsdk.js"></script>
+<body>
+    <div class="container">
+        <h2>排日程</h2>
+        <form id="schedule-form">
+            <div class="form-group">
+                <label for="name-column">名字对应列号:</label>
+                <input type="text" id="name-column" name="name-column" required>
+            </div>
+            <div class="form-group">
+                <label for="store-column">商店对应列号:</label>
+                <input type="text" id="store-column" name="store-column" required>
+            </div>
+            <div class="form-group">
+                <label for="date-column">1日对应列号:</label>
+                <input type="text" id="date-column" name="date-column" required>
+            </div>
+            <div class="form-group date-inputs" id="date-inputs">
+                <!-- 日期输入框会由 JavaScript 动态生成 -->
+            </div>
+            <button type="submit">提交</button>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const params = new URLSearchParams(window.location.search);
+            const regionName = params.get('region');
+            const accountName = params.get('name');
+
+            let scheduleData = {};
+
+            // 动态生成1到31日的输入框
+            const dateInputsContainer = document.getElementById('date-inputs');
+            for (let i = 1; i <= 31; i++) {
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+
+                const label = document.createElement('label');
+                label.setAttribute('for', `day-${i}`);
+                label.textContent = `第${i}日:`;
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.id = `day-${i}`;
+                input.name = `day-${i}`;
+
+                formGroup.appendChild(label);
+                formGroup.appendChild(input);
+                dateInputsContainer.appendChild(formGroup);
+            }
+
+            // 获取表格数据
+            fetch('../../data/schedule.json')
+                .then(response => response.json())
+                .then(data => {
+                    scheduleData = data[regionName];
+                    areaKeys = Object.keys(scheduleData);
+                });
+
+            // 处理表单提交
+            document.getElementById('schedule-form').addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                const nameColumn = document.getElementById('name-column').value.trim();
+                const storeColumn = document.getElementById('store-column').value.trim();
+                const dateColumn = document.getElementById('date-column').value.trim();
+
+                if (!nameColumn) {
+                    alert('请输入名字对应列号');
+                    return;
+                }
+                if (!storeColumn) {
+                    alert('请输入商店对应列号');
+                    return;
+                }
+                if (!dateColumn) {
+                    alert('请输入1日对应列号');
+                    return;
+                }
+
+                const formData = new FormData(event.target);
+                const data = {};
+                formData.forEach((value, key) => {
+                    data[key] = value;
+                });
+
+                if (!window.confirm('确认提交数据?')) return;
+
+                // 处理每一天的数据
+                for (let i = 1; i <= 31; i++) {
+                    const dayInput = data[`day-${i}`];
+                    if (dayInput) {
+                        processDayInput(i, dayInput, nameColumn, storeColumn, dateColumn);
+                    }
+                }
+
+                alert('数据已提交');
+            });
+
+            async function processDayInput(day, dayInput, nameColumn, storeColumn, startDateColumn) {
+                const areaName = getAreaNameForDay(dayInput);
+                if (!scheduleData || !scheduleData[areaName]) return;
+
+                const dayIndex = day - 1;  // 日期索引从0开始
+                const targetColumn = getColumnNameFromNumber(
+                    getColumnNumberFromName(startDateColumn) + dayIndex
+                );
+                
+                const curSheet = window.Application.ActiveSheet;
+            
+                const nameColumnIndex = getColumnNumberFromName(nameColumn);
+                const storeColumnIndex = getColumnNumberFromName(storeColumn);
+                
+                // 获取商店列表
+                const storeList = scheduleData[areaName].map(item => item.store);
+
+                // 设置存储行号索引的数据对象
+                const rowsIndex = [];
+                // 获取当前表格行数
+                const lastRow = curSheet.UsedRange.Rows.Count;
+                
+                // 筛选名字
+                for (let i = 1; i <= lastRow; i++){
+                    const nameCellValue = curSheet.Cells.Item(i, nameColumnIndex).Formula;
+                    if (nameCellValue === accountName) {
+                        const storeCellValue = curSheet.Cells.Item(i, storeColumnIndex).Formula;
+                        if (storeList.includes(storeCellValue)){
+                            curSheet.Cells.Item(i, targetColumn).Formula = 1;
+                        }
+                    }
+
+                }
+
+            }
+
+            // 根据输入框的输入来获取区域名称
+            function getAreaNameForDay(day) {
+                if(day >= 1 && day <= areaKeys.length) {
+                    return areaKeys[day - 1];
+                }
+                return null;
+            }
+
+            // 将列字母转换为列号
+            function getColumnNumberFromName(name) {
+                let column = 0;
+                for (let i = 0; i < name.length; i++) {
+                    column = column * 26 + name.charCodeAt(i) - 'A'.charCodeAt(0) + 1;
+                }
+                return column;
+            }
+
+            // 将列号转换为列字母
+            function getColumnNameFromNumber(number) {
+                let column = '';
+                while (number > 0) {
+                    let mod = (number - 1) % 26;
+                    column = String.fromCharCode(mod + 'A'.charCodeAt(0)) + column;
+                    number = Math.floor((number - mod) / 26);
+                }
+                return column;
+            }
+        });
+    </script>
+</body>
+</html>

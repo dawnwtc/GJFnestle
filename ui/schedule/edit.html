@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑计划</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        .region {
+            margin-bottom: 20px;
+        }
+        .region-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .region-name {
+            margin-right: 20px;
+            font-weight: bold;
+        }
+        .store-list {
+            display: flex;
+            flex-direction: column;
+            margin-left: 20px; /* 控制地区和商店之间的间距 */
+        }
+        .store-input {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+        }
+        .store-input input {
+            margin-right: 10px;
+        }
+        .add-store-button, .remove-button {
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        .add-region-button {
+            margin-top: 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>编辑计划</h1>
+    <div id="schedule" class="container"></div>
+    <button onclick="saveSchedule()">保存更改</button>
+    <button class="add-region-button" onclick="addRegion()">添加地区</button>
+
+    <script>
+        // 获取URL参数
+        const params = new URLSearchParams(window.location.search);
+        const regionName = params.get('region');
+
+        let scheduleData = {};
+
+        // 获取计划数据
+        async function fetchSchedule() {
+            try {
+                const response = await fetch('../../data/schedule.json');
+                const data = await response.json();
+                scheduleData = data; // 保存完整的计划数据
+                renderSchedule();
+            } catch (error) {
+                console.error('获取计划数据时出错:', error);
+            }
+        }
+
+        // 渲染计划数据
+        function renderSchedule() {
+            const container = document.getElementById('schedule');
+            container.innerHTML = '';
+
+            const regionData = scheduleData[regionName] || {};
+
+            for (const [area, stores] of Object.entries(regionData)) {
+                const regionDiv = document.createElement('div');
+                regionDiv.className = 'region';
+
+                // 地区标题
+                const regionHeader = document.createElement('div');
+                regionHeader.className = 'region-header';
+
+                const areaInput = document.createElement('input');
+                areaInput.type = 'text';
+                areaInput.value = area;
+                areaInput.dataset.oldArea = area;
+                areaInput.className = 'region-name';
+                regionHeader.appendChild(areaInput);
+
+                // 添加“+”按钮
+                const addStoreButton = document.createElement('button');
+                addStoreButton.textContent = '+';
+                addStoreButton.className = 'add-store-button';
+                addStoreButton.onclick = () => addStoreInput(regionDiv, area);
+                regionHeader.appendChild(addStoreButton);
+
+                // 添加“-”按钮删除区域
+                const removeAreaButton = document.createElement('button');
+                removeAreaButton.textContent = '-';
+                removeAreaButton.className = 'remove-button';
+                removeAreaButton.onclick = () => removeArea(regionDiv, area);
+                regionHeader.appendChild(removeAreaButton);
+
+                regionDiv.appendChild(regionHeader);
+
+                // 商店列表
+                const storeListDiv = document.createElement('div');
+                storeListDiv.className = 'store-list';
+
+                stores.forEach((storeObj, index) => {
+                    const storeDiv = document.createElement('div');
+                    storeDiv.className = 'store-input';
+
+                    const storeInput = document.createElement('input');
+                    storeInput.type = 'text';
+                    storeInput.value = storeObj.store;
+                    storeInput.dataset.area = area;
+                    storeInput.dataset.index = index;
+                    storeDiv.appendChild(storeInput);
+
+                    // 添加“-”按钮删除商店
+                    const removeStoreButton = document.createElement('button');
+                    removeStoreButton.textContent = '-';
+                    removeStoreButton.className = 'remove-button';
+                    removeStoreButton.onclick = () => removeStore(storeDiv, area, index);
+                    storeDiv.appendChild(removeStoreButton);
+
+                    storeListDiv.appendChild(storeDiv);
+                });
+
+                regionDiv.appendChild(storeListDiv);
+                container.appendChild(regionDiv);
+            }
+        }
+
+        // 添加新商店输入框
+        function addStoreInput(regionDiv, area) {
+            const storeListDiv = regionDiv.querySelector('.store-list');
+            const storeDiv = document.createElement('div');
+            storeDiv.className = 'store-input';
+
+            const storeInput = document.createElement('input');
+            storeInput.type = 'text';
+            storeInput.dataset.area = area;
+            storeInput.dataset.index = 'new'; // 使用 "new" 表示新商店
+            storeDiv.appendChild(storeInput);
+
+            // 添加“-”按钮删除商店
+            const removeStoreButton = document.createElement('button');
+            removeStoreButton.textContent = '-';
+            removeStoreButton.className = 'remove-button';
+            removeStoreButton.onclick = () => removeStore(storeDiv, area, 'new');
+            storeDiv.appendChild(removeStoreButton);
+
+            storeListDiv.appendChild(storeDiv);
+        }
+
+        // 删除商店
+        function removeStore(storeDiv, area, index) {
+            storeDiv.remove();
+            const areaData = scheduleData[regionName][area];
+            if (index === 'new') {
+                // 新商店不在数据中，直接删除即可
+                return;
+            }
+            // 更新数据
+            areaData.splice(index, 1);
+            if (areaData.length === 0) {
+                delete scheduleData[regionName][area];
+            }
+        }
+
+        // 删除区域
+        function removeArea(regionDiv, area) {
+            regionDiv.remove();
+            delete scheduleData[regionName][area];
+        }
+
+        // 添加新地区
+        function addRegion() {
+            const container = document.getElementById('schedule');
+            const regionDiv = document.createElement('div');
+            regionDiv.className = 'region';
+
+            // 地区标题
+            const regionHeader = document.createElement('div');
+            regionHeader.className = 'region-header';
+
+            const areaInput = document.createElement('input');
+            areaInput.type = 'text';
+            areaInput.placeholder = '新地区名称';
+            areaInput.className = 'region-name';
+            regionHeader.appendChild(areaInput);
+
+            // 添加“+”按钮
+            const addStoreButton = document.createElement('button');
+            addStoreButton.textContent = '+';
+            addStoreButton.className = 'add-store-button';
+            addStoreButton.onclick = () => addStoreInput(regionDiv, areaInput.value.trim());
+            regionHeader.appendChild(addStoreButton);
+
+            // 添加“-”按钮删除区域
+            const removeAreaButton = document.createElement('button');
+            removeAreaButton.textContent = '-';
+            removeAreaButton.className = 'remove-button';
+            removeAreaButton.onclick = () => removeArea(regionDiv, areaInput.value.trim());
+            regionHeader.appendChild(removeAreaButton);
+
+            regionDiv.appendChild(regionHeader);
+
+            // 添加空的商店列表
+            const storeListDiv = document.createElement('div');
+            storeListDiv.className = 'store-list';
+            regionDiv.appendChild(storeListDiv);
+
+            container.appendChild(regionDiv);
+        }
+
+        // 保存更改
+        function saveSchedule() {
+            if (!window.confirm('确定要保存更改吗？')) return;
+
+            const regionDivs = document.querySelectorAll('.region');
+            const updatedData = {};
+
+            regionDivs.forEach(regionDiv => {
+                const areaInput = regionDiv.querySelector('.region-header input[type="text"]');
+                const areaName = areaInput.value.trim();
+
+                if (areaName === "") return; // 跳过空的区域名称
+
+                updatedData[areaName] = [];
+
+                const storeInputs = regionDiv.querySelectorAll('.store-list .store-input input[type="text"]');
+                storeInputs.forEach(storeInput => {
+                    const storeName = storeInput.value.trim();
+                    if (storeName !== "") {
+                        updatedData[areaName].push({ store: storeName });
+                    }
+                });
+            });
+
+            // 合并更新的数据与未更改的数据
+            const newScheduleData = { ...scheduleData };
+            newScheduleData[regionName] = updatedData;
+
+            // 发送更新请求到服务器
+            fetch('http://localhost:5000/update-schedule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(newScheduleData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('计划更新成功');
+            })
+            .catch(error => console.error('更新计划时出错:', error));
+        }
+
+        // 初始化获取和渲染
+        fetchSchedule();
+    </script>
+</body>
+</html>

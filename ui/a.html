@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display JSON Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #json-data {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>JSON Data</h1>
+    <div id="json-data">Loading...</div>
+
+    <script>
+        // 异步加载 JSON 数据
+        fetch('../data/a.json')
+            .then(response => response.json())
+            .then(data => {
+                const jsonDataDiv = document.getElementById('json-data');
+                jsonDataDiv.textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                alert('数据加载失败');
+            });
+    </script>
+</body>
+</html>
+解释
